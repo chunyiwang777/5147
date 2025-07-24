@@ -1,0 +1,2393 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Australian Energy Production Visualization</title>
+    <!-- Include D3.js library -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        /* Basic styles */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+
+        /* Switcher styles */
+        .view-switcher {
+            display: flex;
+            gap: 2px;
+            background: #f0f0f0;
+            padding: 4px;
+            border-radius: 12px;
+            margin: 20px auto;
+            width: fit-content;
+        }
+
+        .view-switcher button {
+            padding: 12px 24px;
+            border: none;
+            background: none;
+            border-radius: 8px;
+            font-size: 16px;
+            color: #666;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .view-switcher button.active {
+            background: white;
+            color: #333;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .view-switcher button:hover:not(.active) {
+            background: rgba(255,255,255,0.5);
+        }
+
+        /* Container layout */
+        .container {
+            display: flex;
+            gap: 20px;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        /* Map related styles */
+        .map-container {
+            margin: 40px 0 60px 40px;
+            width: 400px;
+            height: 350px;
+            position: relative;
+        }
+
+        .map-title {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .year-selector-container {
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .year-selector-label {
+            font-size: 14px;
+            color: #333;
+        }
+
+        #mapYear {
+            padding: 6px 12px;
+            font-size: 14px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 100px;
+        }
+
+        .map-legend {
+            position: absolute;
+            left: 10px;
+            bottom: -240px;
+            transform: none;
+            transform-origin: left center;
+            background: transparent;
+            padding: 0;
+            box-shadow: none;
+        }
+
+        .legend-item {
+            margin-bottom: 4px;
+        }
+
+        .legend-item text {
+            font-size: 11px;
+            fill: #333;
+        }
+        #map { position: relative; }
+        .map-tooltip {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            color: #333;
+            pointer-events: none;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            display: none;
+            z-index: 1000;
+            white-space: nowrap;
+        }
+
+        /* Left panel */
+        .chart-panel {
+            flex: 1;
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            position: relative;
+        }
+
+        /* Right panel */
+        .details-panel {
+            width: 400px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .details-card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+         /* Chart title */
+        .panel-title {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        /* Axis styles */
+        .axis text {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .axis path,
+        .axis line {
+            fill: none;
+            stroke: #ddd;
+            shape-rendering: crispEdges;
+        }
+
+         /* Hover info box */
+        .hover-info {
+            position: absolute;
+            top: 10px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 6px 10px;
+            border-radius: 4px;
+            font-size: 13px;
+            pointer-events: none;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            z-index: 100;
+        }
+
+        .hover-info .date-block {
+            background: #f5f5f5;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+
+        .hover-info .energy-block {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .hover-info .color-block {
+            width: 12px;
+            height: 12px;
+            border-radius: 2px;
+        }
+
+        .hover-info .total-block {
+            padding-top: 2px;
+            margin-top: 0;
+            border-top: 1px solid #eee;
+            color: #666;
+        }
+
+        /* Vertical reference line */
+        .vertical-line {
+            stroke: #666;
+            stroke-width: 1px;
+            stroke-dasharray: 5, 5;
+            pointer-events: none;
+        }
+
+        /* Detailed data table */
+        .details-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .details-header {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .details-date {
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        .details-total {
+            font-size: 14px;
+            color: #666;
+        }
+
+        .source-row {
+            display: flex;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .source-color {
+            width: 14px;
+            height: 14px;
+            margin-right: 10px;
+            border-radius: 2px;
+        }
+
+        .source-name {
+            flex: 1;
+        }
+
+        .source-data {
+            display: flex;
+            gap: 20px;
+            text-align: right;
+        }
+
+        .source-energy {
+            width: 80px;
+        }
+
+        .source-percentage {
+            width: 60px;
+            color: #666;
+        }
+
+        .source-value {
+            width: 80px;
+            color: #666;
+        }
+
+        /* Dropdown menu styles */
+        .view-selector {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            color: #333;
+            background: white;
+            cursor: pointer;
+            min-width: 180px;
+        }
+
+        .view-selector:focus {
+            outline: none;
+            border-color: #999;
+        }
+
+        /* Group title */
+        .group-header {
+            font-weight: bold;
+            margin: 15px 0 5px;
+            padding-bottom: 5px;
+            border-bottom: 1px solid #eee;
+        }
+
+         /* Sunburst chart styles */
+        .sunburst-container {
+            display: flex;
+            justify-content: center; 
+            align-items: center;
+            box-sizing: border-box;
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            height: 320px;      
+            position: relative;
+            margin-bottom: 0;   
+        }
+
+        /* Mode switch button styles */
+        .sunburst-mode-switcher {
+            position: absolute;
+            flex-direction: column;  
+            gap: 4px;               
+            top: 10px !important;   
+            left: 10px !important;
+            right: auto;
+            transform: none !important; 
+            z-index: 10;
+            display: flex;
+        }
+
+        .sunburst-mode-switcher .mode-btn {
+            padding: 4px 6px;      
+            font-size: 12px;
+            background: white;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            cursor: pointer;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+            transition: all 0.2s ease;
+        }
+
+        #sunburst .label,
+        #sunburst .percent {
+            font-size: 10px;
+        }
+
+        .sunburst-mode-switcher .mode-btn:hover:not(.active) {
+            background: #f5f5f5;
+        }
+
+        .sunburst-mode-switcher .active {
+            background: #1976d2;
+            color: white;
+        }
+
+        .sunburst-center-text {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            pointer-events: none;
+        }
+
+        .sunburst-center-text .total-value {
+            font-size: 20px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .sunburst-center-text .total-label {
+            font-size: 14px;
+            color: #666;
+        }
+
+        .sunburst-tooltip {
+            position: absolute;
+            background: white;
+            padding: 6px 10px;
+            border-radius: 3px;
+            font-size: 12px;
+            pointer-events: none;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+            display: none;
+            z-index: 1000;
+        }
+
+        /* Date selector styles */
+        .time-selector {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            margin-bottom: 15px;
+            background: white;
+            cursor: pointer;
+        }
+
+        .time-selector:focus {
+            outline: none;
+            border-color: #666;
+        }
+
+        .time-selector-container {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .year-selector,
+        .month-selector {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            background: white;
+            cursor: pointer;
+        }
+
+        .year-selector:focus,
+        .month-selector:focus {
+            outline: none;
+            border-color: #666;
+        }
+
+        /* Insight panel styles */
+        .insight-panel {
+            background: white;
+            border-radius: 8px;
+            padding: 10px 15px;
+            padding-bottom: 15px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            margin-top: 10px;
+            margin-bottom: 0;
+            height: 320px;  
+        }
+
+        .insight-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .insight-body {
+            font-size: 14px;
+            color: #444;
+            line-height: 1.5;
+        }
+
+        .insight-body p {
+            margin: 0;  
+        }
+
+        .insight-section {
+            margin-bottom: 3px;
+        }
+
+        .insight-body ul {
+            list-style-type: disc;
+            padding-left: 20px;
+        }
+
+        .insight-body li {
+            margin-bottom: 10px;
+        }
+        
+        .line-and-small-wrapper {
+            margin: 260px 5px 0 5px;  
+            display: flex;
+            gap: 20px; 
+        }
+        /* Line chart styles */
+        .line-chart-container {
+            flex: 1.5; 
+            width: 600px;
+            height: 400px;
+            background: white;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            padding: 20px;
+              /* Flex items default vertical top-to-bottom layout, only need column direction */
+            display: flex;
+            flex-direction: column;
+        }
+        /* Line chart title */
+        .line-chart-container .chart-title {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        #line-chart {
+            flex: 1 1 auto;
+        }
+
+        .line {
+            fill: none;
+            stroke-width: 2;
+            opacity: 0.8;
+        }
+
+        .focus-line {
+            stroke: #666;
+            stroke-width: 1px;
+            stroke-dasharray: 3,3;
+        }
+
+        .focus-circle {
+            fill: white;
+            stroke-width: 2;
+        }
+
+        .chart-title {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .chart-tooltip {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            pointer-events: none;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            display: none;
+        }
+
+        .chart-tooltip-line {
+            margin: 4px 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .color-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        /* Small Multiples styles */
+        .small-multiples-container {
+            flex: 1.5; 
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            width: 700px;
+            padding: 20px;
+            background: white;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .small-multiple {
+            overflow: visible;
+            display: flex;
+            flex-direction: column;
+            padding: 10px;
+            background: white;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .small-multiple-header,
+        .small-multiple-title {
+            margin: 0;
+        }
+
+        .small-multiple svg {
+            overflow: visible;
+            width: 100%;
+            margin-top: 8px;
+            flex-shrink: 0;
+            display: block;
+            margin-left: -20px; 
+        }
+
+        .small-multiple-title {
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        .small-multiple-value {
+            font-size: 28px;
+            font-weight: bold;
+        }
+
+        .small-multiple-unit {
+            font-size: 14px;
+            color: #666;
+        }
+
+        .reference-line {
+            stroke: #999;
+            stroke-width: 1px;
+            stroke-dasharray: 4,4;
+        }
+
+        .current-line {
+            stroke: #f00;
+            stroke-width: 1px;
+        }
+
+        /* Tour mask and tooltip styles */
+        #tour-mask {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 10000;
+            display: none;
+        }
+
+        #tour-tooltip {
+            position: fixed;
+            max-width: 240px;
+            background: white;
+            border-radius: 6px;
+            padding: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            z-index: 10002;
+            display: none;
+            font-size: 13px;
+            line-height: 1.4;
+        }
+
+        /* Add highlight element styles */
+        .tour-highlight {
+            position: relative;
+            z-index: 10001;
+            box-shadow: 0 0 0 2px #1976d2, 0 0 8px 4px rgba(25, 118, 210, 0.3);
+            border-radius: 4px;
+            pointer-events: none;
+        }
+
+        #tour-tooltip button {
+            margin-top: 8px;
+            font-size: 12px;
+            padding: 4px 8px;
+            cursor: pointer;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+
+        #tour-tooltip #tour-next {
+            background: #1976d2;
+            color: white;
+            border: none;
+        }
+
+        #tour-tooltip #tour-skip {
+            float: right;
+            background: transparent;
+            border: none;
+            color: #999;
+        }
+
+        /* Add description text styles */
+        .map-description {
+            position: absolute;
+            right: -950px;  
+            top: 0;
+            width: 800px;
+            font-size: 14px;
+            line-height: 1.6;
+            color: #333;
+        }
+
+        .map-description h2 {
+            font-size: 24px;
+            margin-bottom: 15px;
+            color: #222;
+        }
+
+        .map-description p {
+            font-size: 14px;
+            margin-bottom: 15px;
+        }
+
+        .map-description strong {
+            font-weight: bold;
+        }
+
+        .insight-panel::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .insight-panel::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+
+        .insight-panel::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 2px;
+        }
+
+        .insight-panel::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+
+        /* Page footer copyright and data source */
+        .page-footer {
+            margin-top: 40px;
+            padding: 12px 0;
+            text-align: center;
+            font-size: 12px;
+            color: #666;
+            background-color: #f5f5f5;
+        }
+        .page-footer a {
+            color: #0074cc;
+            text-decoration: none;
+        }
+        .page-footer a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="chart-panel">
+            <div class="panel-title">Electricity Generation Trends by Energy Source in Australia (GWh/Month) (1999–2025)</div>
+            <div id="chart"></div>
+            <div class="hover-info" style="display: none;"></div>
+
+            <div class="insight-panel">
+                <div class="insight-title">Australian Energy Production & Trends</div>
+                <div class="insight-body">
+                    <p>Since 1999, Australia's total monthly electricity output has climbed from around 12,000 GWh to peaks above 18,000 GWh by 2025. The stacked area chart highlights how coal-fired generation (both black and brown coal) dominated early decades but peaks in 2008 and then gradually receded after 2012, making room for renewables to expand.</p>
+
+                    <p>In the early 2000s, black and brown coal together supplied over 90% of the grid. By late 2024, their combined share fell below 75%, underlining a structural shift away from fossil baseload toward cleaner sources, driven by policy incentives and falling costs for wind and solar.</p>
+
+                    <p>Wind and rooftop solar production remained negligible before 2010 but surged thereafter—wind rose from <1% to nearly 15% of monthly output, while rooftop PV climbed to over 10%. Utility-scale solar added another 5% by 2025. This diversification reflects both technological maturity and supportive state-level renewable targets.</p>
+
+                    <p>Hovering anywhere on the timeline instantly locks in that month across all panels—updating both the breakdown list and the sunburst (or bar-chart) view to show exact GWh values and percentage shares by source. You can switch the secondary visualization between a radial sunburst and a horizontal bar chart, depending on which layout you find clearer, without losing the synchronized monthly context. The "Detailed" vs. "Renewables / Fossils" toggle similarly collapses or expands the fourteen individual sources into three broad categories, giving you both granular and big-picture perspectives with a single click.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="details-panel">
+            <div class="details-card">
+                <div class="details-header">
+                    <select class="view-selector">
+                        <option value="detailed">Detailed</option>
+                        <option value="grouped">Renewables/Fossils</option>
+                    </select>
+                    <div class="time-selector-container">
+                        <select class="year-selector"></select>
+                        <select class="month-selector"></select>
+                    </div>
+                </div>
+                <div class="details-date"></div>
+                <div class="details-total"></div>
+                <div class="sources-list"></div>
+            </div>
+            <div class="sunburst-container">
+                <div class="sunburst-mode-switcher">
+                    <button class="mode-btn active" data-mode="sunburst">☀️</button>
+                    <button class="mode-btn" data-mode="bar">📊</button>
+                </div>
+                <div id="sunburst"></div>
+                <div class="sunburst-center-text">
+                    <div class="total-value"></div>
+                    <div class="total-label">GWh</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="sunburst-tooltip"></div>
+
+    <div class="map-container">
+        <div class="view-switcher">
+            <button class="active" data-view="generation">Generation</button>
+            <button data-view="emissions">Emissions</button>
+            <button data-view="intensity">Intensity</button>
+        </div>
+        <h2 class="map-title">Energy Generation by State</h2>
+        <div class="year-selector-container">
+            <label for="mapYear" class="year-selector-label">Select Year:</label>
+            <select id="mapYear"></select>
+        </div>
+        <div id="map">
+            <div class="map-tooltip"></div>
+        </div>
+        <div class="map-legend"></div>
+    
+        <div class="map-description">
+            <h2>Navigating the State-Level Energy Dashboard</h2>
+            <p>The map above provides a state-level snapshot of Australia's electricity generation (or emissions/intensity) for any year between 2010 and 2024. Use the tab controls to switch between Generation, Emissions, and Intensity views, and pick your Year from the dropdown. Each state is shaded on a sequential scale, so you can instantly see which regions lead or lag in the chosen metric. Hover over a state to reveal its exact figure and compare it at a glance.</p>
+            
+            <p>Below the map on the left is a multi-state line chart that synchronizes with your map selection. It plots five major states (NSW, QLD, SA, TAS, VIC) on a shared vertical axis, so you can trace each state's trajectory from 2010 to 2024. A dashed vertical marker indicates the selected year, making it easy to compare across states at that moment.</p>
+            
+            <p>To the right, a grid of small multiples breaks out each state into its own miniature time-series. The consistent y-axis across all panels ensures you can immediately rank states by magnitude. Hovering over any small multiple will draw the same dashed year marker and reveal the state's total for that period, reinforcing your understanding of both absolute levels and relative performance. Hover anywhere along the timeline to update all charts simultaneously.</p>
+            
+            <p>Together, the map, shared-axis line chart, and small multiples paint a unified picture of Australia's energy transition: coal-dominated New South Wales and Queensland remain the largest generators, while smaller jurisdictions like Tasmania and South Australia—though growing steadily—operate at a fraction of the scale. The synchronized time-series view underscores how each state's output has climbed since 2010, with Victoria's recent push into renewables narrowing its gap with older coal hubs. At the same time, the consistent y-axis across the miniature panels makes it immediately apparent how differently each region weathers seasonal swings—Queensland's relatively flat curve contrasts with the pronounced peaks and troughs of NSW and Victoria. By moving effortlessly between geography ("where"), chronology ("when"), and magnitude ("how much"), users gain a comprehensive sense of both the accelerating rise of clean energy and the enduring footprint of fossil fuels across Australia's states.</p>
+        </div>
+    </div>
+    
+    <div class="line-and-small-wrapper">
+        <div class="line-chart-container">
+          <h2 class="chart-title">Energy Generation Trends by State (2010–2024) (TWh)</h2>
+          <div id="line-chart"></div>
+        </div>
+    
+        <div class="small-multiples-container">
+
+        </div>
+    </div>
+
+    <div id="tour-mask"></div>
+    <div id="tour-tooltip">
+        <div id="tour-text"></div>
+        <button id="tour-next">Next →</button>
+        <button id="tour-skip">Skip</button>
+    </div>
+
+    <script>
+        // Define different data type configurations
+        const dataConfigs = {
+            generation: {
+                breaks: [14, 50, 58, 70, 79],
+                unit: "TWh",
+                colors: d3.schemeBlues[6].slice().reverse()
+            },
+            emissions: {
+                breaks: [3000, 11000, 30000, 40000, 50000, 60000],
+                unit: "ktCO₂-e",
+                colors: d3.schemeReds[7].slice().reverse()
+            },
+            intensity: {
+                breaks: [200, 400, 600, 800, 1000],
+                unit: "kgCO₂-e/MWh",
+                colors: d3.schemeGreens[6].slice().reverse()
+            }
+        };
+
+         // Define view label mappings
+        const viewLabels = {
+            generation: "Energy Generation",
+            emissions: "Emissions",
+            intensity: "Emissions Intensity"
+        };
+        const mapLabels = {
+            generation: "Energy Generation by State",
+            emissions:  "Emissions by State",
+            intensity:  "Emissions Intensity by State"
+        };
+
+        // Add global variables before DOMContentLoaded
+        let mapGeoData, mapStateData, mapUpdateFunc, currentMapView = 'generation';
+
+        document.addEventListener('DOMContentLoaded', function () {
+            const dataFiles = {
+                generation: "NEM-aemo2024-step_change-CDP14-energy.csv",
+                emissions: "NEM-aemo2024-step_change-CDP14-emissions.csv",
+                intensity: "NEM-aemo2024-step_change-CDP14-intensity.csv"
+            };
+            let currentView = 'generation';
+
+            function loadViewData(viewType) {
+                const suffix = " (2010–2024)";
+                d3.select(".map-title")
+                    .text(mapLabels[viewType] + suffix);
+
+                d3.selectAll('.view-switcher button')
+                    .classed('active', false);
+                d3.select(`.view-switcher button[data-view="${viewType}"]`)
+                    .classed('active', true);
+
+                const unit = dataConfigs[viewType].unit;
+                const label = viewLabels[viewType] || viewType;
+                d3.select(".line-chart-container .chart-title")
+                    .text(`${label} Trends by State (2010–2024) (${unit})`);
+
+                d3.select("#line-chart").selectAll("*").remove();
+                d3.select(".small-multiples-container").selectAll("*").remove();
+
+                currentMapView = viewType;
+                Promise.all([
+                    d3.json("states.geojson"),
+                    d3.csv(dataFiles[viewType])
+                ]).then(function([geoData, data]) {
+                    mapGeoData = geoData;  
+                    
+                    const stateData = {};
+                    const parseDate = d3.timeParse("%e %b %Y %I:%M %p");
+                    data.forEach(d => {
+                        const date = parseDate(d.date);
+                        const year = date.getFullYear();
+                        if (year >= 2010 && year <= 2024) {
+                            if (!stateData[year]) stateData[year] = {};
+                            Object.keys(d).forEach(key => {
+                                if (key !== "date") {
+                                    stateData[year][key.trim()] = +d[key];
+                                }
+                            });
+                        }
+                    });
+                    
+                    mapStateData = stateData;  
+                    
+                    mapUpdateFunc = initializeMap();
+                    
+                    const yearSelector = d3.select("#mapYear");
+                    yearSelector.selectAll("option").remove();
+                    const years = Object.keys(stateData).sort();
+                    yearSelector.selectAll("option")
+                        .data(years)
+                        .enter()
+                        .append("option")
+                        .text(d => d)
+                        .attr("value", d => d);
+
+                    const initialYear = years[0];
+                    yearSelector.property("value", initialYear);
+                    mapUpdateFunc(mapGeoData, stateData[initialYear], viewType);
+
+                    yearSelector.on("change", function() {
+                        mapUpdateFunc(mapGeoData, stateData[this.value], viewType);
+                    });
+
+                    createLineChart(data, viewType);
+                    createSmallMultiples(data, viewType);
+                }).catch(function(error) {
+                    console.error("Error loading data:", error);
+                });
+            }
+
+            d3.selectAll('.view-switcher button').on('click', function() {
+                const viewType = d3.select(this).attr('data-view');
+                if (viewType !== currentView) {
+                    currentView = viewType;
+                    loadViewData(viewType);
+                }
+            });
+
+            loadViewData('generation');
+
+            const margin = { top: 20, right: 20, bottom: 30, left: 80 };
+            const width = document.querySelector('.chart-panel').clientWidth - margin.left - margin.right - 40;
+            const height = 600 - margin.top - margin.bottom;
+
+
+            const svg = d3.select("#chart")
+                .append("svg")
+                .attr("width", width + margin.left + margin.right)
+                .attr("height", height + margin.top + margin.bottom)
+                .append("g")
+                .attr("transform", `translate(${margin.left},${margin.top})`);
+
+            // Define energy types and corresponding colors
+            const energyTypes = [
+                "Coal (Brown)",
+                "Coal (Black)",
+                "Gas (Steam)",
+                "Gas (CCGT)",
+                "Gas (OCGT)",
+                "Gas (Reciprocating)",
+                "Gas (Waste Coal Mine)",
+                "Hydro",
+                "Wind",
+                "Solar (Utility)",
+                "Solar (Rooftop)",
+                "Bioenergy (Biomass)",
+                "Battery (Discharging)",
+                "Distillate"
+            ];
+
+            const colors = [
+                "#8b4513", // Brown coal - Dark brown
+                "#2f4f4f", // Black coal - Dark gray
+                "#ff7f00", // Steam gas - Orange
+                "#fdb462", // Combined cycle gas - Light orange
+                "#ffed6f", /// Open cycle gas - Yellow
+                "#fccde5", // Reciprocating gas - Pink
+                "#fb8072", // Waste coal mine gas - Red orange
+                "#80b1d3", // Hydro - Blue
+                "#b3de69", // Wind - Light green
+                "#ffff99", // Utility solar - Yellow
+                "#ffffcc", // Rooftop solar - Light yellow
+                "#8dd3c7", // Bioenergy - Cyan green
+                "#bebada", // Battery discharge - Purple
+                "#d9d9d9"  // Diesel - Gray
+            ];
+
+            d3.csv("19981201 Open Electricity.csv").then(function (data) {
+                data.forEach(d => {
+                    d.date = new Date(d.date);
+                    energyTypes.forEach(type => {
+                        d[type + " -  GWh"] = +d[type + " -  GWh"] || 0;
+                        d[type + " -  $/MWh"] = +d[type + " -  $/MWh"] || 0;
+                    });
+                });
+
+                const x = d3.scaleTime()
+                    .domain(d3.extent(data, d => d.date))
+                    .range([0, width]);
+
+                const y = d3.scaleLinear()
+                    .domain([0, d3.max(data, d => {
+                        let sum = 0;
+                        energyTypes.forEach(type => {
+                            sum += d[type + " -  GWh"] || 0;
+                        });
+                        return sum;
+                    })])
+                    .range([height, 0]);
+
+                const stack = d3.stack()
+                    .keys(energyTypes.map(type => type + " -  GWh"))
+                    .order(d3.stackOrderNone)
+                    .offset(d3.stackOffsetNone);
+
+                const stackedData = stack(data);
+
+                const area = d3.area()
+                    .x(d => x(d.data.date))
+                    .y0(d => y(d[0]))
+                    .y1(d => y(d[1]));
+
+                svg.selectAll("path")
+                    .data(stackedData)
+                    .join("path")
+                    .attr("fill", (d, i) => colors[i])
+                    .attr("d", area);
+
+                svg.append("g")
+                    .attr("class", "axis")
+                    .attr("transform", `translate(0,${height})`)
+                    .call(d3.axisBottom(x)
+                        .ticks(d3.timeYear.every(1))
+                        .tickFormat(d3.timeFormat("%Y")));
+
+                svg.append("g")
+                    .attr("class", "axis")
+                    .call(d3.axisLeft(y)
+                        .tickFormat(d => d3.format(",")(Math.round(d)) + " GWh"));
+
+                const hoverInfo = d3.select(".hover-info");
+                const detailsDate = d3.select(".details-date");
+                const detailsTotal = d3.select(".details-total");
+                const sourcesList = d3.select(".sources-list");
+
+                const overlay = svg.append("rect")
+                    .attr("width", width)
+                    .attr("height", height)
+                    .attr("fill", "none")
+                    .attr("pointer-events", "all");
+
+                const verticalLine = svg.append("line")
+                    .attr("class", "vertical-line")
+                    .attr("y1", 0)
+                    .attr("y2", height)
+                    .style("display", "none");
+
+                function getDataAtMouse(mouseX) {
+                    const date = x.invert(mouseX);
+                    const bisect = d3.bisector(d => d.date).left;
+                    const index = bisect(data, date);
+                    return data[index];
+                }
+
+                function getStackedValueAtMouse(mouseX, mouseY) {
+                    const d = getDataAtMouse(mouseX);
+                    if (!d) return null;
+
+                    const mouseValue = y.invert(mouseY);
+
+                    if (currentViewMode === 'detailed') {
+                        let cumulative = 0;
+                        for (let i = 0; i < energyTypes.length; i++) {
+                            const type = energyTypes[i];
+                            const value = d[type + " -  GWh"] || 0;
+                            const y0 = cumulative;
+                            cumulative += value;
+                            const y1 = cumulative;
+
+                            if (mouseValue >= y0 && mouseValue <= y1) {
+                                return {
+                                    type: type,
+                                    value: value,
+                                    color: colors[i]
+                                };
+                            }
+                        }
+                    } else {
+                        const groupData = calculateGroupData(d);
+                        let cumulative = 0;
+                        const groups = ['Renewables', 'Fossils', 'Battery'];
+
+                        for (let i = 0; i < groups.length; i++) {
+                            const group = groups[i];
+                            const value = groupData[group];
+                            const y0 = cumulative;
+                            cumulative += value;
+                            const y1 = cumulative;
+
+                            if (mouseValue >= y0 && mouseValue <= y1) {
+                                return {
+                                    type: group,
+                                    value: value,
+                                    color: groupColors[group.toLowerCase()]
+                                };
+                            }
+                        }
+                    }
+                    return null;
+                }
+
+                const energyGroups = {
+                    renewables: [
+                        "Wind",
+                        "Solar (Utility)",
+                        "Solar (Rooftop)",
+                        "Hydro",
+                        "Bioenergy (Biomass)"
+                    ],
+                    fossils: [
+                        "Coal (Brown)",
+                        "Coal (Black)",
+                        "Gas (Steam)",
+                        "Gas (CCGT)",
+                        "Gas (OCGT)",
+                        "Gas (Reciprocating)",
+                        "Gas (Waste Coal Mine)",
+                        "Distillate"
+                    ],
+                    battery: [
+                        "Battery (Discharging)"
+                    ]
+                };
+
+                const groupColors = {
+                    renewables: "#4CAF50",  
+                    fossils: "#795548",     
+                    battery: "#2196F3"      
+                };
+
+                let currentViewMode = 'detailed';
+
+                 // Get current view mode energy types and colors
+                function getCurrentTypes() {
+                    if (currentViewMode === 'detailed') {
+                        return {
+                            types: energyTypes,
+                            colors: colors
+                        };
+                    } else {
+                        return {
+                            types: ['Renewables', 'Fossils', 'Battery'],
+                            colors: [groupColors.renewables, groupColors.fossils, groupColors.battery]
+                        };
+                    }
+                }
+
+                // Calculate group data
+                function calculateGroupData(d) {
+                    const groupData = {
+                        'Renewables': 0,
+                        'Fossils': 0,
+                        'Battery': 0
+                    };
+
+                    energyGroups.renewables.forEach(type => {
+                        groupData['Renewables'] += d[type + " -  GWh"] || 0;
+                    });
+
+                    energyGroups.fossils.forEach(type => {
+                        groupData['Fossils'] += d[type + " -  GWh"] || 0;
+                    });
+
+                    energyGroups.battery.forEach(type => {
+                        groupData['Battery'] += d[type + " -  GWh"] || 0;
+                    });
+
+                    return groupData;
+                }
+
+                 // Update view mode
+                function updateViewMode(mode) {
+                    currentViewMode = mode;
+
+                    // 1. Generate new keys (either 14 types of energy or 3 groups) and their corresponding colors
+                    let newKeys, newColors, newStackData;
+                    if (mode === 'detailed') {
+                        newKeys = energyTypes.map(type => type + " -  GWh");
+                        newColors = colors;
+                        newStackData = d3.stack()
+                            .keys(newKeys)
+                            .order(d3.stackOrderNone)
+                            .offset(d3.stackOffsetNone)(data);
+                    } else {
+                        newKeys = ['Renewables', 'Fossils', 'Battery'];
+                        newColors = [groupColors.renewables, groupColors.fossils, groupColors.battery];
+                        newStackData = d3.stack()
+                            .keys(newKeys)
+                            .value((d, key) => calculateGroupData(d)[key])
+                            (data);
+                    }
+
+                    // 2. Recalculate Y axis scale and update y.domain
+                    const maxY = d3.max(data, d => {
+                        if (mode === 'detailed') {
+                            return energyTypes.reduce((sum, t) => sum + (d[t + " -  GWh"] || 0), 0);
+                        } else {
+                            const g = calculateGroupData(d);
+                            return g.Renewables + g.Fossils + g.Battery;
+                        }
+                    });
+                    y.domain([0, maxY]);
+                    svg.select(".axis.y")
+                        .transition().duration(1000)
+                        .call(d3.axisLeft(y)
+                            .tickFormat(d => d3.format(",")(Math.round(d)) + " GWh")
+                        );
+
+                    // 3. "Delete old path first, then draw new path based on newStackData"
+                    svg.selectAll("path").remove();
+                    svg.selectAll("path")
+                        .data(newStackData)
+                        .enter().append("path")
+                        .attr("fill", (d, i) => newColors[i])
+                        .attr("d", area);
+                    overlay.raise();
+
+                    // 4. If current mouse is on a date, update both right panel and Sunburst
+                    const currentData = getDataAtMouse(lastMouseX);
+                    if (currentData) {
+                        updateDetails(currentData);
+                        createSunburst(currentData, mode);
+                    }
+                }
+
+                // Add y-axis class name
+                svg.append("g")
+                    .attr("class", "axis y")
+                    .call(d3.axisLeft(y)
+                        .tickFormat(d => d3.format(",")(Math.round(d)) + " GWh"));
+
+                // Add view switch event listener
+                d3.select('.view-selector').on('change', function () {
+                    const mode = this.value;
+                    updateViewMode(mode);
+
+                    const currentData = getDataAtMouse(lastMouseX);
+                    if (currentData) {
+                        createSunburst(currentData, mode);
+                    }
+                });
+
+                // Modify function to update details panel
+                function updateDetails(d) {
+                    const dateStr = d3.timeFormat("%B %Y")(d.date);
+                    detailsDate.text(dateStr);
+
+                    let total = 0;
+                    const groupData = calculateGroupData(d);
+
+                    if (currentViewMode === 'detailed') {
+                        // Detailed view shows all energy types
+                        energyTypes.forEach(type => {
+                            total += d[type + " -  GWh"] || 0;
+                        });
+
+                        sourcesList.html("");
+                        energyTypes.forEach((type, i) => {
+                            const value = d[type + " -  GWh"] || 0;
+                            const percentage = total > 0 ? (value / total * 100) : 0;
+                            addSourceRow(type, value, percentage, colors[i]);
+                        });
+                    } else {
+                        // Grouped view shows renewable and fossil fuels
+                        total = Object.values(groupData).reduce((a, b) => a + b, 0);
+
+                        sourcesList.html("");
+                        Object.entries(groupData).forEach(([group, value]) => {
+                            const percentage = total > 0 ? (value / total * 100) : 0;
+                            addSourceRow(group, value, percentage, groupColors[group.toLowerCase()]);
+                        });
+                    }
+
+                    detailsTotal.text(`Total ${d3.format(",")(Math.round(total))} GWh/month`);
+                }
+
+               // Add source data row
+                function addSourceRow(name, value, percentage, color) {
+                    const row = sourcesList.append("div")
+                        .attr("class", "source-row");
+
+                    row.append("div")
+                        .attr("class", "source-color")
+                        .style("background-color", color);
+
+                    row.append("div")
+                        .attr("class", "source-name")
+                        .text(name);
+
+                    const dataDiv = row.append("div")
+                        .attr("class", "source-data");
+
+                    dataDiv.append("div")
+                        .attr("class", "source-energy")
+                        .text(value > 0 ? d3.format(",")(Math.round(value)) : "-");
+
+                    dataDiv.append("div")
+                        .attr("class", "source-percentage")
+                        .text(d3.format(".1f")(percentage) + "%");
+                }
+
+                let lastMouseX = 0;
+
+                // Add Sunburst chart related code
+                let currentSunburstMode = "sunburst"; 
+                let lastData = null; // Store last data
+
+                // Add mode switch event listener
+                d3.selectAll(".mode-btn").on("click", function() {
+                    const mode = d3.select(this).attr("data-mode");
+                    if (mode !== currentSunburstMode) {
+                        currentSunburstMode = mode;
+
+                        d3.selectAll(".mode-btn").classed("active", false);
+                        d3.select(this).classed("active", true);
+
+                        updateSunburstMode(lastData, currentViewMode);
+                    }
+                });
+
+                function updateSunburstMode(data, mode) {
+                     // Clear all existing chart content
+                    d3.select("#sunburst").selectAll("*").remove();
+                    
+                    // Create chart based on current mode
+                    if (currentSunburstMode === "sunburst") {
+                        createSunburst(data, mode);
+                    } else {
+                        createBarChart(data, mode);
+                    }
+
+                    // Control visibility of center text
+                    d3.select(".sunburst-center-text")
+                        .style("display", currentSunburstMode === "sunburst" ? "block" : "none");
+                }
+
+                function createSunburst(data, mode) {
+                    if (!data) return;
+                    
+                    lastData = data;
+                    const width = 300;
+                    const height = 300;
+                    const radius = Math.min(width, height) / 2;
+
+                    // Clear existing content
+                    d3.select("#sunburst").selectAll("*").remove();
+
+                    // Create new SVG
+                    const svg = d3.select("#sunburst")
+                        .append("svg")
+                        .attr("width", width)
+                        .attr("height", height);
+
+                    // Create main drawing group
+                    const g = svg.append("g")
+                        .attr("transform", `translate(${width / 2},${height / 2})`);
+
+                    // Prepare data
+                    let pieData;
+                    let total = 0;
+
+                    if (mode === 'detailed') {
+                        pieData = energyTypes.map(type => {
+                            const value = data[type + " -  GWh"] || 0;
+                            total += value;
+                            return {
+                                name: type,
+                                value: value,
+                                color: colors[energyTypes.indexOf(type)]
+                            };
+                        }).filter(d => d.value > 0);
+                    } else {
+                        const groupData = calculateGroupData(data);
+                        pieData = Object.entries(groupData).map(([group, value]) => ({
+                            name: group,
+                            value: value,
+                            color: groupColors[group.toLowerCase()]
+                        })).filter(d => d.value > 0);
+                        total = pieData.reduce((sum, d) => sum + d.value, 0);
+                    }
+
+                    // Create pie chart generator
+                    const pie = d3.pie()
+                        .value(d => d.value)
+                        .sort(null);
+
+                    // Create arc generator
+                    const arc = d3.arc()
+                        .innerRadius(radius * 0.6)
+                        .outerRadius(radius * 0.95);
+
+                     // Draw pie slices
+                    g.selectAll("path")
+                        .data(pie(pieData))
+                        .join("path")
+                        .attr("d", arc)
+                        .attr("fill", d => d.data.color)
+                        .attr("stroke", "white")
+                        .attr("stroke-width", 1)
+                        .on("mouseover", function(event, d) {
+                            d3.select(this).attr("opacity", 0.8);
+                            const tooltip = d3.select(".sunburst-tooltip");
+                            tooltip.html(`${d.data.name}<br>${d3.format(",")(Math.round(d.data.value))} GWh<br>${(d.data.value / total * 100).toFixed(1)}%`)
+                                .style("display", "block")
+                                .style("left", (event.pageX + 10) + "px")
+                                .style("top", (event.pageY - 10) + "px");
+                        })
+                        .on("mouseout", function() {
+                            d3.select(this).attr("opacity", 1);
+                            d3.select(".sunburst-tooltip").style("display", "none");
+                        });
+
+                    // Update center text
+                    d3.select(".total-value")
+                        .text(d3.format(",")(Math.round(total)));
+                }
+
+                function createBarChart(data, mode) {
+                    if (!data) return;
+
+                    // Clear existing content
+                    d3.select("#sunburst").selectAll("*").remove();
+
+                    // Data preprocessing
+                    let chartData;
+                    if (mode === "detailed") {
+                        chartData = energyTypes.map((type, i) => ({
+                            name: type,
+                            value: data[type + " -  GWh"] || 0,
+                            color: colors[i]
+                        }));
+                    } else {
+                        const groupData = calculateGroupData(data);
+                        chartData = Object.entries(groupData).map(([group, value]) => ({
+                            name: group,
+                            value,
+                            color: groupColors[group.toLowerCase()]
+                        }));
+                    }
+                    
+                    // Filter out 0s and sort in descending order
+                    chartData = chartData
+                        .filter(d => d.value > 0)
+                        .sort((a, b) => b.value - a.value);
+                    const total = d3.sum(chartData, d => d.value);
+
+                    // Layout parameters
+                    const containerW = d3.select('.sunburst-container').node().clientWidth;
+                    const margin = { top: 10, right: 60, bottom: 10, left: 140 };
+                    const barH = 16;
+                    const gap = 4;
+                    const innerW = containerW - margin.left - margin.right;
+                    const innerH = chartData.length * (barH + gap) + margin.top + margin.bottom;
+
+                    const svg = d3.select("#sunburst")
+                        .append("svg")
+                        .attr("width", containerW)
+                        .attr("height", innerH);
+
+                    const g = svg.append("g")
+                        .attr("transform", `translate(${margin.left},${margin.top})`);
+
+                    // Set scales
+                    const x = d3.scaleLinear()
+                        .domain([0, d3.max(chartData, d => d.value)])
+                        .range([0, innerW]);
+
+                    // Draw bars
+                    g.selectAll("rect")
+                        .data(chartData)
+                        .join("rect")
+                        .attr("x", 0)
+                        .attr("y", (_, i) => i * (barH + gap))
+                        .attr("width", d => x(d.value))
+                        .attr("height", barH)
+                        .attr("fill", d => d.color)
+                        .attr("rx", 2)
+                        .on("mouseover", function(event, d) {
+                            d3.select(this).attr("opacity", 0.8);
+                            const tooltip = d3.select(".sunburst-tooltip");
+                            tooltip.html(`${d.name}<br>${d3.format(",")(Math.round(d.value))} GWh<br>${(d.value / total * 100).toFixed(1)}%`)
+                                .style("display", "block")
+                                .style("left", (event.pageX + 10) + "px")
+                                .style("top", (event.pageY - 10) + "px");
+                        })
+                        .on("mouseout", function() {
+                            d3.select(this).attr("opacity", 1);
+                            d3.select(".sunburst-tooltip").style("display", "none");
+                        });
+
+                    // Percentage text
+                    g.selectAll(".percent")
+                        .data(chartData)
+                        .join("text")
+                        .attr("class", "percent")
+                        .attr("x", d => x(d.value) + 5)
+                        .attr("y", (_, i) => i * (barH + gap) + barH / 2)
+                        .attr("dy", "0.35em")
+                        .text(d => `${(d.value / total * 100).toFixed(1)}%`);
+
+                    // Left labels
+                    g.selectAll(".label")
+                        .data(chartData)
+                        .join("text")
+                        .attr("class", "label")
+                        .attr("x", -10)
+                        .attr("y", (_, i) => i * (barH + gap) + barH / 2)
+                        .attr("dy", "0.35em")
+                        .attr("text-anchor", "end")
+                        .text(d => d.name);
+                }
+
+                // Debounce function
+                function debounce(func, wait) {
+                    let timeout;
+                    return function(...args) {
+                        clearTimeout(timeout);
+                        timeout = setTimeout(() => func.apply(this, args), wait);
+                    };
+                }
+
+                function updateSunburstMode(data, mode) {
+                    if (!data) return;
+
+                    // Control visibility of center text
+                    d3.select(".sunburst-center-text")
+                        .style("display", currentSunburstMode === "sunburst" ? "block" : "none");
+                    
+                    // Create chart based on current mode
+                    if (currentSunburstMode === "sunburst") {
+                        createSunburst(data, mode);
+                    } else {
+                        createBarChart(data, mode);
+                    }
+                }
+
+                // Use debounce for mode switching
+                const debouncedUpdateMode = debounce((mode) => {
+                    if (mode !== currentSunburstMode && lastData) {
+                        currentSunburstMode = mode;
+                        d3.selectAll(".mode-btn").classed("active", false);
+                        d3.select(`[data-mode="${mode}"]`).classed("active", true);
+                        updateSunburstMode(lastData, currentViewMode);
+                    }
+                }, 100);
+
+               // Add mode switch event listener
+                d3.selectAll(".mode-btn").on("click", function() {
+                    const mode = d3.select(this).attr("data-mode");
+                    debouncedUpdateMode(mode);
+                });
+
+                // Initialize date selector
+                function initializeTimeSelector() {
+                    const yearSelector = document.querySelector('.year-selector');
+                    const monthSelector = document.querySelector('.month-selector');
+
+                    // Get date range from data
+                    const dates = data.map(d => d.date);
+                    const minDate = d3.min(dates);
+                    const maxDate = d3.max(dates);
+
+                    // Fill year selector
+                    const years = [...new Set(dates.map(d => d.getFullYear()))].sort();
+                    years.forEach(year => {
+                        const option = document.createElement('option');
+                        option.value = year;
+                        option.textContent = year;
+                        yearSelector.appendChild(option);
+                    });
+
+                      // Month names
+                    const monthNames = [
+                        'January', 'February', 'March', 'April', 'May', 'June',
+                        'July', 'August', 'September', 'October', 'November', 'December'
+                    ];
+
+                    // Fill month selector
+                    monthNames.forEach((month, index) => {
+                        const option = document.createElement('option');
+                        option.value = index;
+                        option.textContent = month;
+                        monthSelector.appendChild(option);
+                    });
+
+                    // Set default value to latest date
+                    yearSelector.value = maxDate.getFullYear();
+                    monthSelector.value = maxDate.getMonth();
+
+                    // Add event listeners
+                    function onDateChange() {
+                        const selectedYear = parseInt(yearSelector.value);
+                        const selectedMonth = parseInt(monthSelector.value);
+
+                        const selectedData = data.find(d => {
+                            return d.date.getMonth() === selectedMonth &&
+                                d.date.getFullYear() === selectedYear;
+                        });
+
+                        if (selectedData) {
+                            updateVisualization(selectedData);
+                        }
+                    }
+
+                    yearSelector.addEventListener('change', onDateChange);
+                    monthSelector.addEventListener('change', onDateChange);
+
+                    // Update visualization function
+                    function updateVisualization(selectedData) {
+                        const dateStr = d3.timeFormat("%B %Y")(selectedData.date);
+                        detailsDate.text(dateStr);
+
+                        let total = 0;
+                        sourcesList.html(""); 
+
+                        if (currentViewMode === 'detailed') {
+                            energyTypes.forEach(type => {
+                                total += selectedData[type + " -  GWh"] || 0;
+                            });
+
+                            energyTypes.forEach((type, i) => {
+                                const value = selectedData[type + " -  GWh"] || 0;
+                                const percentage = total > 0 ? (value / total * 100) : 0;
+                                addSourceRow(type, value, percentage, colors[i]);
+                            });
+                        } else {
+                            const groupData = calculateGroupData(selectedData);
+                            total = Object.values(groupData).reduce((a, b) => a + b, 0);
+
+                            Object.entries(groupData).forEach(([group, value]) => {
+                                const percentage = total > 0 ? (value / total * 100) : 0;
+                                addSourceRow(group, value, percentage, groupColors[group.toLowerCase()]);
+                            });
+                        }
+
+                        detailsTotal.text(`Total ${d3.format(",")(Math.round(total))} GWh/month`);
+                        updateSunburstMode(selectedData, currentViewMode);
+                        lastMouseX = x(selectedData.date);
+                    }
+
+                    // Update date selector on mouse move
+                    overlay.on("mousemove", function (event) {
+                        const [mouseX, mouseY] = d3.pointer(event);
+                        lastMouseX = mouseX;
+
+                        verticalLine
+                            .attr("x1", mouseX)
+                            .attr("x2", mouseX)
+                            .style("display", "block");
+
+                        const d = getDataAtMouse(mouseX);
+                        if (d) {
+                            // Update date selector
+                            yearSelector.value = d.date.getFullYear();
+                            monthSelector.value = d.date.getMonth();
+
+                            // Update right panel data
+                            updateVisualization(d);
+
+                            // Update hover-info tooltip
+                            const hoverData = getStackedValueAtMouse(mouseX, mouseY);
+                            if (hoverData) {
+                                hoverInfo
+                                    .html(`
+                                        <div class="date-block">${d3.timeFormat("%B %Y")(d.date)}</div>
+                                        <div class="energy-block">
+                                            <span class="color-block" style="background:${hoverData.color}"></span>
+                                            ${hoverData.type} ${d3.format(",")(Math.round(hoverData.value))} GWh/month
+                                        </div>
+                                        <div class="total-block">
+                                            Total ${d3.format(",")(Math.round(
+                                                currentViewMode === 'detailed'
+                                                ? energyTypes.reduce((sum, t) => sum + (d[t + " -  GWh"] || 0), 0)
+                                                : Object.values(calculateGroupData(d)).reduce((a, b) => a + b, 0)
+                                            ))} GWh/month
+                                        </div>
+                                    `)
+                                    .style("display", "flex");
+                            } else {
+                                hoverInfo.style("display", "none");
+                            }
+
+                            // Sync with map
+                            const year = d.date.getFullYear();
+                            if (mapUpdateFunc && mapStateData && year >= 2010 && year <= 2024) {
+                                mapUpdateFunc(mapGeoData, mapStateData[year], currentMapView);
+                                // Sync with map year selector
+                                d3.select("#mapYear").property("value", year);
+                            }
+                        }
+                    });
+
+                    overlay.on("mouseout", function() {
+                        verticalLine.style("display", "none");
+                        hoverInfo.style("display", "none");
+                    });
+                }
+
+                // Initialize date selector after data load
+                initializeTimeSelector();
+            });
+        });
+
+        // Modify map initialization function
+        function initializeMap() {
+            const width = 400;
+            const height = 400;
+
+            // Clear existing map content
+            d3.select("#map svg").remove();
+
+           // Create SVG container
+            const mapSvg = d3.select("#map")
+                .append("svg")
+                .attr("width", width)
+                .attr("height", height);
+
+            // Create map projection
+            const projection = d3.geoMercator()
+                .center([133, -28])
+                .scale(550)
+                .translate([width / 2, height / 2]);
+
+            // Define path generator
+            const path = d3.geoPath()
+                .projection(projection);
+
+            function updateMap(geoData, data, viewType) {
+                const config = dataConfigs[viewType];
+                
+                 // Create color scale
+                const colorScale = d3.scaleThreshold()
+                    .domain(config.breaks)
+                    .range(config.colors);
+
+                // Update map
+                mapSvg.selectAll("path")
+                    .data(geoData.features)
+                    .join("path")
+                    .attr("d", path)
+                    .style("stroke", "white")
+                    .style("stroke-width", 1)
+                    .style("fill", d => {
+                        const value = data[d.properties.STATE_NAME];
+                        return value != null ? colorScale(value) : "#ccc";
+                    })
+                    .on("mouseover", function(event, d) {
+                        // 1) Highlight map itself
+                        d3.select(this)
+                            .style("stroke", "#333")
+                            .style("stroke-width", 2);
+
+                        const value = data[d.properties.STATE_NAME];
+                        
+                        // 2) Calculate legend index
+                        const legendIndex = value != null
+                            ? d3.bisectRight(config.breaks, value)
+                            : -1;
+
+                        // 3) Highlight tooltip
+                        const [mx, my] = d3.pointer(event, document.getElementById("map"));
+                        const label = value != null ? value.toFixed(1) + " " + config.unit : "No data";
+
+                        d3.select(".map-tooltip")
+                            .html(`
+                                <strong>${d.properties.STATE_NAME}</strong><br>
+                                ${label}
+                            `)
+                            .style("left", (mx + 10) + "px")
+                            .style("top", (my + 10) + "px")
+                            .style("display", "block");
+
+                        // 4) Highlight corresponding legend-item
+                        d3.selectAll(".legend-item")
+                            .style("opacity", 0.3)
+                            .select("text")
+                            .style("font-weight", "normal");
+
+                        if (legendIndex >= 0) {
+                            d3.select(`.legend-item[data-index="${legendIndex}"]`)
+                                .style("opacity", 1)
+                                .select("text")
+                                .style("font-weight", "bold");
+                        }
+                    })
+                    .on("mousemove", function(event) {
+                        const [mx, my] = d3.pointer(event, document.getElementById("map"));
+                        d3.select(".map-tooltip")
+                            .style("left", (mx + 10) + "px")
+                            .style("top", (my + 10) + "px");
+                    })
+                    .on("mouseout", function(event, d) {
+                        // 1) Restore map stroke
+                        d3.select(this)
+                            .style("stroke", "white")
+                            .style("stroke-width", 1);
+                        
+                        // 2) Hide tooltip
+                        d3.select(".map-tooltip")
+                            .style("display", "none");
+                        
+                        // 3) Reset legend style
+                        d3.selectAll(".legend-item")
+                            .style("opacity", 1)
+                            .select("text")
+                            .style("font-weight", "normal");
+                    });
+
+                // Update legend
+                d3.select(".map-legend").selectAll("*").remove();
+                const legendSvg = d3.select(".map-legend")
+                    .append("svg")
+                    .attr("width", 150)
+                    .attr("height", 140);
+
+                const legendItems = legendSvg.selectAll(".legend-item")
+                    .data(d3.range(config.colors.length))
+                    .enter()
+                    .append("g")
+                    .attr("class", "legend-item")
+                    .attr("data-index", d => d)  // Bind index
+                    .attr("transform", (d, i) => `translate(0, ${i * 20})`);
+
+                legendItems.append("rect")
+                    .attr("width", 12)
+                    .attr("height", 12)
+                    .style("fill", d => config.colors[d]);
+
+                legendItems.append("text")
+                    .attr("x", 20)
+                    .attr("y", 12)
+                    .style("font-size", "12px")
+                    .text((d, i) => {
+                        if (i === 0) {
+                            return `< ${config.breaks[0]} ${config.unit}`;
+                        }
+                        if (i === config.colors.length - 1) {
+                            const last = config.breaks[config.breaks.length - 1];
+                            return `≥ ${last} ${config.unit}`;
+                        }
+                        const lo = config.breaks[i - 1];
+                        const hi = config.breaks[i];
+                        return `${lo} - ${hi} ${config.unit}`;
+                    });
+            }
+
+            return updateMap;
+        }
+
+        function updateAllViews(year, x, y, focus, yearLabel, states, yearData) {
+            if (year >= 2010 && year <= 2024) {
+                // Update line chart
+                focus.select(".focus-line")
+                    .attr("x1", x(year))
+                    .attr("x2", x(year));
+
+                yearLabel.text(year);
+
+                states.forEach(state => {
+                    const value = yearData[year][state];
+                    focus.select(`.focus-circle.${state.replace(/\s+/g, '-')}`)
+                        .attr("cx", x(year))
+                        .attr("cy", y(value));
+                });
+
+                // Update all Small Multiples
+                d3.selectAll(".small-multiple").each(function() {
+                    const sm = d3.select(this);
+                    const ov = sm.select("rect").node();
+                    const smallX = ov.__x;
+                    const state = sm.attr("data-state");
+                    const value = yearData[year][state];
+                    
+                    sm.select(".small-multiple-value")
+                        .text(Math.round(value));
+                    
+                    sm.select(".year-label")
+                        .text(year);
+                    
+                    sm.select(".reference-line")
+                        .attr("x1", smallX(year))
+                        .attr("x2", smallX(year))
+                        .style("display", "block");
+                });
+
+                // Sync with map
+                if (mapUpdateFunc && mapStateData) {
+                    mapUpdateFunc(mapGeoData, mapStateData[year], currentMapView);
+                    // Sync with map year selector
+                    d3.select("#mapYear").property("value", year);
+                }
+            }
+        }
+
+        function createLineChart(data,viewType) {
+            const unit = dataConfigs[viewType].unit;
+            const margin = {top: 20, right: 120, bottom: 30, left: 60};  
+            const width = 650;  
+            const chartWidth = width - margin.left - margin.right;  
+            const height = 350 - margin.top - margin.bottom;
+
+            d3.select("#line-chart").selectAll("*").remove();
+
+            const svg = d3.select("#line-chart")
+                .append("svg")
+                .attr("width", width) 
+                .attr("height", height + margin.top + margin.bottom);
+
+            // Create main chart group
+            const mainGroup = svg.append("g")
+                .attr("transform", `translate(${margin.left},${margin.top})`);
+
+            const states = ["New South Wales", "Queensland", "South Australia", "Tasmania", "Victoria"];
+            const stateColors = {
+                "New South Wales": "#1f77b4",
+                "Queensland": "#ff7f0e",
+                "South Australia": "#2ca02c",
+                "Tasmania": "#d62728",
+                "Victoria": "#9467bd"
+            };
+
+            const parseDate = d3.timeParse("%e %b %Y %I:%M %p");
+            const yearData = {};
+            data.forEach(d => {
+                const date = parseDate(d.date);
+                const year = date.getFullYear();
+                if (year >= 2010 && year <= 2024) {
+                    if (!yearData[year]) yearData[year] = {};
+                    states.forEach(state => {
+                        yearData[year][state] = +d[state];
+                    });
+                }
+            });
+
+            // Create x-axis scale
+            const x = d3.scaleLinear()
+                .domain([2010, 2024])
+                .range([0, chartWidth]); 
+
+            const y = d3.scaleLinear()
+                .domain([0, d3.max(states, state => d3.max(Object.values(yearData), year => year[state]))])
+                .range([height, 0])
+                .nice();
+
+            const line = d3.line()
+                .x(d => x(+d[0]))
+                .y(d => y(d[1]));
+
+            // Draw all chart elements
+            // Add x-axis
+            mainGroup.append("g")
+                .attr("class", "x axis")
+                .attr("transform", `translate(0,${height})`)
+                .call(d3.axisBottom(x)
+                    .ticks(15)
+                    .tickFormat(d3.format("d")));
+
+            // Add y-axis
+            mainGroup.append("g")
+                .attr("class", "y axis")
+                .call(d3.axisLeft(y));
+                
+
+            // Draw lines
+            states.forEach(state => {
+                const lineData = Object.entries(yearData)
+                    .map(([year, values]) => [year, values[state]]);
+
+                mainGroup.append("path")
+                    .datum(lineData)
+                    .attr("class", "line")
+                    .attr("d", line)
+                    .style("stroke", stateColors[state])
+                    .style("fill", "none")
+                    .style("stroke-width", 2);
+            });
+
+            // Create interactive elements
+            const focus = mainGroup.append("g")
+                .attr("class", "focus")
+                .style("display", "none");
+
+            // Add data points for each state
+            focus.append("line")
+                .attr("class", "focus-line")
+                .attr("y1", 0)
+                .attr("y2", height)
+                .style("stroke", "#666")
+                .style("stroke-width", 1)
+                .style("stroke-dasharray", "3,3");
+
+            // Modify year label position and style
+            states.forEach(state => {
+                focus.append("circle")
+                    .attr("class", `focus-circle ${state.replace(/\s+/g, '-')}`)
+                    .attr("r", 4)
+                    .style("fill", "white")
+                    .style("stroke", stateColors[state])
+                    .style("stroke-width", 2);
+            });
+
+            // Modify year label position and style
+            const yearLabel = focus.append("text")
+                .attr("class", "year-label")
+                .attr("text-anchor", "end")
+                .attr("x", chartWidth) 
+                .attr("y", -10)   
+                .style("font-size", "14px")
+                .style("font-weight", "bold");
+
+             // Add value label group
+            const valueLabels = focus.append("g")
+                .attr("class", "value-labels");
+
+            // Add legend last, ensure it's on top
+            const legend = svg.append("g")
+                .attr("class", "legend")
+                .attr("transform", `translate(${width - margin.right + 10},${margin.top})`);  // 调整图例位置
+
+            states.forEach((state, i) => {
+                const legendItem = legend.append("g")
+                    .attr("transform", `translate(0,${i * 25})`);  
+
+                legendItem.append("rect")
+                    .attr("width", 12)
+                    .attr("height", 12)
+                    .style("fill", stateColors[state]);
+
+                legendItem.append("text")
+                    .attr("x", 20)
+                    .attr("y", 10)
+                    .style("font-size", "12px")
+                    .text(state);
+            });
+
+            // Modify overlay width
+            const overlay = mainGroup.append("rect")
+                .attr("class", "overlay")
+                .attr("width", chartWidth) 
+                .attr("height", height)
+                .style("fill", "none")
+                .style("pointer-events", "all");
+                
+           // Store x and y scales for Small Multiples
+            overlay.node().__x = x;
+            overlay.node().__y = y;
+
+           // Add mouse event
+            overlay
+                .on("mouseover", () => {
+                    focus.style("display", null);
+                    // Show reference lines of all Small Multiples
+                    d3.selectAll(".small-multiple .reference-line").style("display", "block");
+                })
+                .on("mouseout", () => {
+                    focus.style("display", "none");
+                    // Hide reference lines of all Small Multiples
+                    d3.selectAll(".small-multiple .reference-line").style("display", "none");
+                    // Clear all Small Multiple year labels
+                    d3.selectAll(".small-multiple .year-label").text("");
+                })
+                .on("mousemove", function(event) {
+                    const mouseX = d3.pointer(event)[0];
+                    const year = Math.round(x.invert(mouseX));
+                    updateAllViews(year, x, y, focus, yearLabel, states, yearData);
+                });
+        }
+
+        function createSmallMultiples(data,viewType) {
+            const unit = dataConfigs[viewType].unit;
+            const container = d3.select(".small-multiples-container");
+            const states = ["New South Wales", "Queensland", "South Australia", "Tasmania", "Victoria"];
+            const stateColors = {
+                "New South Wales": "#1f77b4",
+                "Queensland": "#ff7f0e",
+                "South Australia": "#2ca02c",
+                "Tasmania": "#d62728",
+                "Victoria": "#9467bd"
+            };
+
+            const parseDate = d3.timeParse("%e %b %Y %I:%M %p");
+            const yearData = {};
+            data.forEach(d => {
+                const date = parseDate(d.date);
+                const year = date.getFullYear();
+                if (year >= 2010 && year <= 2024) {
+                    if (!yearData[year]) yearData[year] = {};
+                    states.forEach(state => {
+                        yearData[year][state] = +d[state];
+                    });
+                }
+            });
+
+            states.forEach(state => {
+                const currentValue = yearData[2024][state];
+
+                 // 1) Create card
+                const div = container.append("div")
+                    .attr("class", "small-multiple")
+                    .attr("data-state", state);
+
+                // 2) Header: value + unit, arranged via flex
+                const header = div.append("div")
+                    .attr("class", "small-multiple-header")
+                    .style("display", "flex")
+                    .style("align-items", "baseline")
+                    .style("margin-bottom", "4px");
+
+                header.append("div")
+                    .attr("class", "small-multiple-value")
+                    .style("font-size", "28px")
+                    .style("font-weight", "bold")
+                    .text(Math.round(currentValue));
+
+                header.append("div")
+                    .attr("class", "small-multiple-unit")
+                    .style("font-size", "14px")
+                    .style("color", "#666")
+                    .style("margin-left", "4px")
+                    .text(unit);
+
+               // 3) Title
+                div.append("div")
+                    .attr("class", "small-multiple-title")
+                    .style("font-size", "16px")
+                    .style("font-weight", "bold")
+                    .style("margin-bottom", "6px")
+                    .text(state);
+
+                // 4) Then draw SVG area underneath
+                const margin = {top: 0, right: 10, bottom: 20, left: 30};
+                const width = 170;
+                const height = 80;
+                const svg = div.append("svg")
+                    .attr("width", width + margin.left + margin.right)
+                    .attr("height", height + margin.top + margin.bottom)
+                    .append("g")
+                    .attr("transform", `translate(${margin.left},${margin.top})`);
+
+                 // Add year label
+                const yearLabel = svg.append("text")
+                    .attr("class", "year-label")
+                    .attr("text-anchor", "end")
+                    .attr("x", width - 5)
+                    .attr("y", 10)
+                    .style("font-size", "12px")
+                    .style("font-weight", "bold");
+
+                const x = d3.scaleLinear()
+                    .domain([2010, 2024])
+                    .range([0, width - 5]);
+
+                const y = d3.scaleLinear()
+                    .domain([0, d3.max(Object.values(yearData), d => d[state])])
+                    .range([height, 0]);
+
+                // Add area
+                const area = d3.area()
+                    .x(d => x(+d[0]))
+                    .y0(height)
+                    .y1(d => y(d[1]));
+
+                svg.append("path")
+                    .datum(Object.entries(yearData).map(([year, values]) => [year, values[state]]))
+                    .attr("fill", stateColors[state])
+                    .attr("fill-opacity", 0.3)
+                    .attr("d", area);
+
+                 // Add x-axis
+                svg.append("g")
+                    .attr("transform", `translate(0,${height})`)
+                    .call(d3.axisBottom(x)
+                        .ticks(3)
+                        .tickFormat(d3.format("d")));
+
+               // Add reference line (initially hidden)
+                svg.append("line")
+                    .attr("class", "reference-line")
+                    .attr("y1", 0)
+                    .attr("y2", height)
+                    .style("stroke", "#666")
+                    .style("stroke-width", 1)
+                    .style("stroke-dasharray", "3,3")
+                    .style("display", "none");
+
+                // Add overlay
+                const overlay = svg.append("rect")
+                    .attr("width", width)
+                    .attr("height", height)
+                    .style("fill", "none")
+                    .style("pointer-events", "all");
+
+                // Store x and y scales for updating
+                overlay.node().__x = x;
+                overlay.node().__y = y;
+
+                 // Modify mouse event handling
+                overlay.on("mousemove", function(event) {
+                    const [mouseX] = d3.pointer(event);
+                    const year = Math.round(x.invert(mouseX));
+                    
+                    if (year >= 2010 && year <= 2024) {
+                        const lineChart = d3.select("#line-chart");
+                        const lineChartOverlay = lineChart.select(".overlay").node();
+                        const lineX = lineChartOverlay.__x;
+                        const lineY = lineChartOverlay.__y;
+                        const focus = lineChart.select(".focus");
+                        const yearLabel = focus.select(".year-label");
+                        
+                        focus.style("display", null);
+                        
+                        updateAllViews(year, lineX, lineY, focus, yearLabel, states, yearData);
+                    }
+                });
+
+                // Add mouse out event
+                overlay.on("mouseout", function() {
+                    svg.select(".reference-line").style("display", "none");
+                    svg.select(".year-label").text("");
+                    
+                    const lineChart = d3.select("#line-chart");
+                    const focus = lineChart.select(".focus");
+                    focus.style("display", "none");
+                    
+                    d3.selectAll(".small-multiple .reference-line").style("display", "none");
+                    d3.selectAll(".small-multiple .year-label").text("");
+                });
+            });
+        }
+
+        // New user guide functionality
+        function startTour() {
+            const steps = [
+                {
+                    // Step 1: Area chart
+                    sel: "#chart",
+                    text: "This is the main stack area chart. Hover to see monthly breakdown by source.",
+                    position: "right"
+                },
+                {
+                    // Step 2: Side panel
+                    sel: ".details-panel .details-card",
+                    text: "Use these selectors and view switcher to toggle between detailed/grouped modes and pick date.",
+                    position: "left"
+                },
+                {
+                    // Step 3: Sunburst switch
+                    sel: ".sunburst-mode-switcher",
+                    text: "Click these buttons to switch between Sunburst (☀️) and Bar Chart (📊) views for a different perspective on the data.",
+                    position: "right"
+                },
+                {
+                    // Step 4: Map switch
+                    sel: ".map-container .view-switcher",
+                    text: "In this map you can explore generation, emissions and intensity by state and year.",
+                    position: "right"
+                }
+            ];
+
+            let idx = 0;
+            const mask = document.getElementById("tour-mask");
+            const tip = document.getElementById("tour-tooltip");
+            const txt = document.getElementById("tour-text");
+            const btn = document.getElementById("tour-next");
+            const skip = document.getElementById("tour-skip");
+
+            function showStep(i) {
+                if (i >= steps.length) return endTour();
+                const { sel, text, position } = steps[i];
+                const el = document.querySelector(sel);
+                if (!el) return endTour();
+
+                // Clear previous highlight
+                document.querySelectorAll('.tour-highlight').forEach(el => {
+                    el.classList.remove('tour-highlight');
+                });
+
+                 // Mask + tooltip visible
+                mask.style.display = tip.style.display = "block";
+                txt.textContent = text;
+                btn.textContent = i === steps.length - 1 ? "Done" : "Next →";
+
+                // Get target element and tooltip dimensions
+                const r = el.getBoundingClientRect();
+                const tipRect = tip.getBoundingClientRect();
+
+                // Calculate tooltip position based on position
+                let left, top;
+                
+                switch (position) {
+                    case "right":
+                        left = window.scrollX + r.right + 20;
+                        top = window.scrollY + r.top;
+                        break;
+                    case "left":
+                        left = window.scrollX + r.left - tipRect.width - 20;
+                        top = window.scrollY + r.top;
+                        break;
+                    default:
+                        left = window.scrollX + r.left;
+                        top = window.scrollY + r.bottom + 20;
+                }
+
+               // Ensure tooltip doesn't go out of viewport
+                const viewportWidth = window.innerWidth;
+                const viewportHeight = window.innerHeight;
+
+                if (left + tipRect.width > viewportWidth) {
+                    left = viewportWidth - tipRect.width - 20;
+                }
+                if (left < 20) {
+                    left = 20;
+                }
+                if (top + tipRect.height > viewportHeight) {
+                    top = viewportHeight - tipRect.height - 20;
+                }
+                if (top < 20) {
+                    top = 20;
+                }
+
+                tip.style.left = left + "px";
+                tip.style.top = top + "px";
+
+                // Add highlight effect
+                el.classList.add('tour-highlight');
+            }
+
+            function endTour() {
+                mask.style.display = tip.style.display = "none";
+                btn.removeEventListener("click", onNext);
+                skip.removeEventListener("click", endTour);
+                // Clear all highlight states
+                document.querySelectorAll('.tour-highlight').forEach(el => {
+                    el.classList.remove('tour-highlight');
+                });
+            }
+
+            function onNext() {
+                idx++;
+                showStep(idx);
+            }
+
+            btn.addEventListener("click", onNext);
+            skip.addEventListener("click", endTour);
+
+            // Start from step 0
+            showStep(0);
+        }
+
+        document.addEventListener("DOMContentLoaded", function () {
+
+            startTour();
+        });
+    </script>
+    <div class="chart-tooltip"></div>
+    
+    <!-- Page footer copyright and data source -->
+    <footer class="page-footer">
+        © Australian Government Department of Climate Change, Energy, the Environment and Water.
+        Data source: <a href="https://www.energy.gov.au/energy-data" target="_blank" rel="noopener">energy.gov.au/energy-data</a>.
+        State boundaries GeoJSON © <a href="https://github.com/tonywr71/GeoJson-Data" target="_blank" rel="noopener">Tonywr71</a>, under <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT License</a>.
+    </footer>
+</body>
+
+</html>
